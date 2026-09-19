@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ASCII Space Shooter</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      color: #fff;
+      height: 100%;
+      overflow: hidden;
+      font-family: "Cascadia Mono", "Consolas", "Courier New", monospace;
+      outline: none;
+    }
+    body { cursor: crosshair; }
+    #screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 12px;
+      box-sizing: border-box;
+      user-select: none;
+    }
+    pre {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1;
+      letter-spacing: 0.5px;
+      font-family: inherit;
+      white-space: pre;
+      text-shadow: 0 0 6px rgba(120, 200, 255, 0.18);
+    }
+    #hint {
+      position: absolute;
+      bottom: 8px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: #666;
+      font-size: 12px;
+      font-family: inherit;
+      pointer-events: none;
+    }
+    #click-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.78);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #7fd0ff;
+      font-size: 28px;
+      font-family: inherit;
+      z-index: 10;
+      cursor: pointer;
+      letter-spacing: 2px;
+    }
+    #click-overlay.hidden { display: none; }
+  </style>
+</head>
+<body tabindex="0">
+  <div id="screen"><pre id="out">connecting…</pre></div>
+  <div id="hint">Arrows / WASD to move · Space to fire · P pause</div>
+  <div id="click-overlay">CLICK TO PLAY</div>
+
+  <script>
+    const out = document.getElementById("out");
+    const overlay = document.getElementById("click-overlay");
+    let ws = null;
+    let reconnectTimer = null;
+
+    function connect() {
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      ws = new WebSocket(`${proto}://${location.host}`);
+
+      ws.addEventListener("open", () => {
+        out.innerHTML = "connected — click to play";
+      });
+
+      ws.addEventListener("message", (ev) => {
+        if (typeof ev.data === "string") {
+          out.innerHTML = ev.data;
+        }
+      });
+
+      ws.addEventListener("close", () => {
+        out.innerHTML = "disconnected — reconnecting…";
+        scheduleReconnect();
+      });
+
+      ws.addEventListener("error", () => {
+        try { ws.close(); } catch (_) {}
+      });
+    }
+
+    function scheduleReconnect() {
+      if (reconnectTimer) return;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, 500);
+    }
+
+    function sendKey(name, down) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ type: down ? "keydown" : "keyup", name }));
+    }
+
+    const map = {
+      ArrowLeft: "left",
+      ArrowRight: "right",
+      ArrowUp: "up",
+      ArrowDown: "down",
+      a: "a", A: "a",
+      d: "d", D: "d",
+      w: "w", W: "w",
+      s: "s", S: "s",
+      p: "p", P: "p",
+      r: "r", R: "r",
+      q: "q", Q: "q",
+      " ": "space",
+    };
+
+    function grabFocus() {
+      window.focus();
+      document.body.focus();
+      if (document.hasFocus()) {
+        overlay.classList.add("hidden");
+      }
+    }
+
+    window.addEventListener("keydown", (ev) => {
+      const name = map[ev.key];
+      if (!name) return;
+      ev.preventDefault();
+      if (ev.repeat) return;
+      sendKey(name, true);
+    });
+
+    window.addEventListener("keyup", (ev) => {
+      const name = map[ev.key];
+      if (!name) return;
+      ev.preventDefault();
+      sendKey(name, false);
+    });
+
+    window.addEventListener("focus", () => {
+      if (document.hasFocus()) overlay.classList.add("hidden");
+    });
+
+    window.addEventListener("blur", () => {
+      overlay.classList.remove("hidden");
+    });
+
+    document.addEventListener("mousedown", () => {
+      grabFocus();
+    });
+
+    document.addEventListener("keydown", () => {
+      grabFocus();
+    });
+
+    window.addEventListener("load", () => {
+      grabFocus();
+    });
+
+    connect();
+  </script>
+</body>
+</html>
